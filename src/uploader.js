@@ -79,7 +79,12 @@ const subjectMapping = {
   Pytorch:52,
   ML:54,
   "Scikit Learn":56,
-  Kubernetes:52
+  "Deep Learning":52,
+  Kubernetes:52,
+  Jenkins:54,
+  FastAPI: 56,
+  AWS:52,
+  Pydantic:52
 };
 
 // ---------------------------------************Class Recordings*************----------------------------------
@@ -155,7 +160,7 @@ async function uploadVideo(filePath, auth) {
 
     // Execute the additional query to insert into recording_batch
     const additionalQuery = `
-    INSERT INTO wbl_newDB.recording_batch (recording_id, batch_id)
+    INSERT INTO whitebox_learning.recording_batch (recording_id, batch_id)
     SELECT nr.id AS recording_id, b.batchid AS batch_id
     FROM recording nr
     JOIN batch b ON nr.batchname = b.batchname

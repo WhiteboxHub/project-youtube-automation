@@ -1,5 +1,6 @@
 // -----------------------------------------------------------***************************----------------------
 
+// YouTube-Automation/src/session_uploader.js
 const fs = require("fs");
 const path = require("path");
 const { google } = require("googleapis");
@@ -190,21 +191,37 @@ async function uploadVideo(filePath, auth) {
         return;
       }
 
-      // Insert into new_session
+      // // Insert into new_session
+      // const sessionQuery = `
+      //         INSERT INTO session (title, status, sessiondate, type, subject, recorded, uploaded, link, videoid, invitation, lastmoddatetime, subject_id)
+      //         VALUES (?, 'Completed', ?, ?, ?, 'Y', 'Y', ?, ?, 'Y', ?, ?)
+      //     `;
+      // const sessionValues = [
+      //   fileName,
+      //   sessionDate,
+      //   sessionType,
+      //   instructorName,
+      //   youtubeLink,
+      //   videoId,
+      //   lastModDateTime,
+      //   subjectId,
+      // ];
+
       const sessionQuery = `
-              INSERT INTO session (title, status, sessiondate, type, subject, recorded, uploaded, link, videoid, invitation, lastmoddatetime, subject_id)
-              VALUES (?, 'Completed', ?, ?, ?, 'Y', 'Y', ?, ?, 'Y', ?, ?)
-          `;
-      const sessionValues = [
-        fileName,
-        sessionDate,
-        sessionType,
-        instructorName,
-        youtubeLink,
-        videoId,
-        lastModDateTime,
-        subjectId,
-      ];
+            INSERT INTO session (title, status, sessiondate, type, subject, link, videoid, lastmoddatetime, subject_id)
+            VALUES (?, 'Completed', ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const sessionValues = [
+            fileName,         // title
+            sessionDate,      // sessiondate
+            sessionType,      // type
+            instructorName,   // subject (in your DDL this is just varchar, so I’m mapping instructor name here)
+            youtubeLink,      // link
+            videoId,          // videoid
+            lastModDateTime,  // lastmoddatetime
+            subjectId,        // subject_id
+        ];
 
       await executeTransaction(sessionQuery, sessionValues);
 
