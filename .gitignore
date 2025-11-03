@@ -1,1 +1,57 @@
+# Video files
 *.mkv
+*.mp4
+*.avi
+*.wmv
+*.mov
+*.flv
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Credentials and secrets
+config/credentials.json
+config/backup_credentials.json
+config/token.json
+config/backup_token.json
+
+# Node modules
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Uploads and done folders
+uploads/*
+!uploads/.gitkeep
+done/*
+!done/.gitkeep
+
+# Test files
+*.test.js
+*.spec.js
+coverage/
+
+# Build files
+dist/
+build/

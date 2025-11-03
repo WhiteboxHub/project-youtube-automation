@@ -2,10 +2,9 @@ const fs = require("fs");
 const path = require("path");
 const { google } = require("googleapis");
 const mysql = require("mysql2");
-const { uploadToBackup } = require("./backup_uploader"); // NEW: Import backup uploader
+const { uploadToBackup } = require("./backup_uploader");
 require("dotenv").config();
 
-// MySQL database connection configuration
 const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -24,7 +23,6 @@ connection.connect((err) => {
   console.log("Connected to MySQL");
 });
 
-// Subject to subjectid mapping
 const subjectMapping = {
   SDLC: 65,
   "JIRA-Agile": 4,
@@ -86,33 +84,29 @@ const subjectMapping = {
 // ---------------------------------************Class Recordings*************----------------------------------
 
 async function uploadVideo(filePath, auth) {
-  console.log("Starting upload process for:", filePath);
+  console.log("[PRIMARY] Starting upload process for:", filePath);
+
+  const originalFilePath = filePath;
 
   try {
     const youtube = google.youtube({ version: "v3", auth });
     const fileSize = fs.statSync(filePath).size;
 
-    // Extract batch ID, subject, and clean filename
     const fileName = path.basename(filePath);
     const parts = fileName.split("_");
+    const classDate = parts[1]; 
+    const batchname = parts[parts.length - 1].split(".")[0]; 
 
-    // Example: Class_2025-08-29_52_Ajmeer_Python_OopsInheritance_2025-08.wmv
-    const classDate = parts[1]; // "2025-08-29"
-    const batchname = parts[parts.length - 1].split(".")[0]; // "2025-08"
-
-    // Clean filename (remove batchname before saving)
     const cleanFileName = parts.slice(0, -1).join("_") + path.extname(fileName);
 
-    // Subject extraction
-    const subject = parts[4]; // e.g., "Python"
+    const subject = parts[4]; 
     const subjectId = subjectMapping[subject];
 
     if (!subjectId) {
-      console.error("Invalid subject:", subject);
+      console.error("[PRIMARY] Invalid subject:", subject);
       return;
     }
 
-    // Upload to YouTube (PRIMARY CHANNEL)
     console.log("[PRIMARY] Uploading to primary channel...");
     const res = await youtube.videos.insert(
       {
@@ -121,7 +115,7 @@ async function uploadVideo(filePath, auth) {
         requestBody: {
           snippet: {
             title: cleanFileName,
-            description: cleanFileName, // Use clean filename
+            description: cleanFileName,
           },
           status: {
             privacyStatus: "unlisted",
@@ -143,13 +137,11 @@ async function uploadVideo(filePath, auth) {
     console.log("[PRIMARY] Upload complete:", res.data);
     console.log("[PRIMARY] YouTube Video ID:", res.data.id);
 
-    // Primary upload success - prepare data
     const videoId = res.data.id;
     const videoTitle = res.data.snippet.title;
     const lastModDateTime = new Date().toISOString().slice(0, 10);
     const youtubeLink = `https://www.youtube.com/watch?v=${videoId}`;
 
-    // Insert into MySQL with PRIMARY link
     const query = `
       INSERT INTO recording (
         batchname, description, type, classdate, link, videoid, subject, filename, lastmoddatetime, new_subject_id
@@ -163,15 +155,20 @@ async function uploadVideo(filePath, auth) {
       youtubeLink,
       videoId,
       subject,
-      cleanFileName, // save clean filename
+      cleanFileName,
       lastModDateTime,
       subjectId,
     ];
 
-    connection.query(query, values, async (err, results) => {
-      if (err) {
-        console.error("[PRIMARY] Error inserting video ID into MySQL:", err);
-      } else {
+    // Use Promise wrapper for MySQL query to properly handle async flow
+    await new Promise((resolve, reject) => {
+      connection.query(query, values, async (err, results) => {
+        if (err) {
+          console.error("[PRIMARY] Error inserting video ID into MySQL:", err);
+          reject(err);
+          return;
+        }
+
         console.log("[PRIMARY] Video ID inserted into MySQL:", results);
 
         // Execute the additional query to insert into recording_batch
@@ -196,14 +193,13 @@ async function uploadVideo(filePath, auth) {
           }
         });
 
-        // NEW: Upload to BACKUP CHANNEL (wrapped in try-catch to prevent primary workflow failure)
         try {
           console.log("[BACKUP] Starting backup upload...");
           const backupUrl = await uploadToBackup(
-            filePath,
+            originalFilePath,
             cleanFileName,
             cleanFileName,
-            'class' // Type is 'class'
+            'class'
           );
 
           // Update the same record with backup_url
@@ -213,21 +209,29 @@ async function uploadVideo(filePath, auth) {
             WHERE videoid = ?
           `;
 
-          connection.query(updateQuery, [backupUrl, videoId], (updateErr, updateResults) => {
-            if (updateErr) {
-              console.error("[BACKUP] Error updating backup_url in MySQL:", updateErr);
-            } else {
-              console.log("[BACKUP] Backup URL updated in MySQL:", updateResults);
-              console.log("[BACKUP] Backup URL:", backupUrl);
-            }
+          // Use Promise wrapper to properly await the database update
+          await new Promise((resolveUpdate, rejectUpdate) => {
+            connection.query(updateQuery, [backupUrl, videoId], (updateErr, updateResults) => {
+              if (updateErr) {
+                console.error("[BACKUP] Error updating backup_url in MySQL:", updateErr);
+                rejectUpdate(updateErr);
+              } else {
+                console.log("[BACKUP] Backup URL updated in MySQL:", updateResults);
+                console.log("[BACKUP] Backup URL:", backupUrl);
+                resolveUpdate(updateResults);
+              }
+            });
           });
 
+          console.log("[BACKUP] Backup process completed successfully");
+          resolve(results);
+
         } catch (backupError) {
-          // Log backup error but don't throw - primary workflow continues
           console.error("[BACKUP] Backup upload failed (non-critical):", backupError.message);
           console.log("[PRIMARY] Primary workflow completed successfully despite backup failure");
+          resolve(results); 
         }
-      }
+      });
     });
 
     return res.data;
