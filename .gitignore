@@ -18,6 +18,7 @@ config/credentials.json
 config/backup_credentials.json
 config/token.json
 config/backup_token.json
+config/settings.json
 
 # Node modules
 node_modules/
